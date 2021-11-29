@@ -18,6 +18,8 @@ def train_one_model(client_id, epoch, batch_size, train, x_test, y_test):
     # process data
     x_train, y_train = np.hsplit(train, [784,])
 
+    sub_model_dir = "../models/train"
+    check_and_build_dir(sub_model_dir)
     sub_model_path = f"../models/train/{client_id}.npy"
 
     model = FedClient(model=create_model_mnist(), ID=client_id)
@@ -68,6 +70,8 @@ def test_federated_model(client_num, x_test, y_test):
     global_model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     loss, acc = global_model.evaluate(x=x_test,
                                       y=y_test, batch_size=128)
+    global_model_dir = "../models/global"
+    check_and_build_dir(global_model_dir)
     global_model_path = "../models/global/global_model.npy"
     global_model.save_model(global_model_path, weight=True)
     print(f'global_loss:{loss}, global_acc:{acc}')
@@ -118,6 +122,7 @@ def test_federated():
         global_loss_list.append(round(global_loss, 4))
         global_acc_list.append(round(global_acc, 4))
     save_results(clients_loss_list, clients_acc_list, global_loss_list, global_acc_list)
+    save_pics(clients_num)
 
 
 def check_and_build_dir(dir_path):
@@ -147,13 +152,15 @@ def save_to_file(file_path, content_list):
     f.close()
 
 
-def save_pics(clients_data_dir, global_data_dir, clients_num):
+def save_pics(clients_num):
     # plt config
     plt_config = {
         "title" : "",
         "xlabel" : "federated rounds",
         "ylabel" : "",
     }
+    clients_data_dir = "../results/clients"
+    global_data_dir = "../results/global"
 
     for client_id in range(clients_num):
         # 1. process loss data
@@ -207,8 +214,4 @@ def save_to_pic(data_dir, dest_dir, plt_config):
 
 
 if __name__ == '__main__':
-    # test_federated()
-    clients_data_dir = "../results/clients"
-    global_data_dir = "../results/global"
-    clients_num = 10
-    save_pics(clients_data_dir, global_data_dir, clients_num)
+    test_federated()
