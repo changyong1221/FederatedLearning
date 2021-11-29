@@ -57,6 +57,8 @@ class FedServer(BaseModel):
     def load_client_weights(self, model_path_list):
         arr = []
         for model_path in model_path_list:
+            # print("There is one!!")
+            # print(np.load(model_path, allow_pickle=True))
             arr.append(np.load(model_path, allow_pickle=True))
         self.models_data = np.array(arr)
 
@@ -70,6 +72,8 @@ class FedServer(BaseModel):
     def fl_average(self):
         # FL average
         self.weights = np.average(self.models_data, axis=0)
+        # print("federated weights!!")
+        # print(self.weights)
         self.model.set_weights(self.weights)
 
     def setJob(self, jobAdress):
@@ -77,6 +81,7 @@ class FedServer(BaseModel):
 
     def get_modelsID_list_from_block(self):
         pass
+
 
 if __name__ == '__main__':
     pass
