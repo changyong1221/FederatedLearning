@@ -83,7 +83,7 @@ def test_federated():
     x_train, y_train, x_test, y_test = load_mnist()
 
     # parameters
-    federated_rounds = 10
+    federated_rounds = 1
     train_epoch = 2
     clients_num = 10
     batch_size = 64
