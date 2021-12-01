@@ -61,7 +61,7 @@ def test_one_model():
 def test_federated_model(client_num, x_test, y_test):
     sub_model_paths = []
     for i in range(client_num):
-        sub_model_paths.append(f"../models/train/{i}.npy")
+        sub_model_paths.append(f"../models.py/train/{i}.npy")
 
     global_model = FedServer(model=create_model_mnist())
     global_model.load_client_weights(sub_model_paths)

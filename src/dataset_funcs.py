@@ -45,17 +45,4 @@ def load_mnist():
 
 
 if __name__ == "__main__":
-    dataset_path = "../datasets/computer_status_dataset.csv"
-    features = ['cpu_usage', 'memory_usage', 'disk_usage', 'num_tasks',
-                'bandwidth', 'mips', 'cpu_freq', 'cpu_cache', 'ram',
-                'ram_freq', 'disk', 'pes_num', 'priority']
-    x_train, y_train, x_test, y_test = load_all_dataset(dataset_path, features)
-    # print(len(x_train))
-    # print(len(y_train))
-    # print(len(x_test))
-    # print(len(y_test))
-    # print("x_train")
-    # print(x_train[:10])
-    # print("x_test")
-    # print(x_test[:10])
-    print(np.shape(x_train))
+    pass

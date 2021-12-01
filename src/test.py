@@ -90,7 +90,7 @@ def test_federated_model():
     client_num = 2
     sub_model_paths = []
     for i in range(client_num):
-        sub_model_paths.append(f"../models/train/{i + 1}.npy")
+        sub_model_paths.append(f"../models.py/train/{i + 1}.npy")
 
 
     global_model = FedServer(model=create_model_update())

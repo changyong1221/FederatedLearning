@@ -10,6 +10,27 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="C:\Users\a1441\anaconda3\envs\FederatedLearning\Lib\site-packages\torch\optim\_functional.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\src-pytorch\clients.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\src-pytorch\get_data.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\src\dataset_funcs.py">
           <value>
             <Attribute>
@@ -24,6 +45,20 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\src\pytorch_mnist2.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\src\src-pytorch\__init__.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\src\test.py">
           <value>
             <Attribute>
@@ -32,6 +67,27 @@
           </value>
         </entry>
         <entry key="\src\test_federated.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\src\test_pytorch_mnist.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\src_torch\models.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\src_torch\server.py">
           <value>
             <Attribute>
               <option name="separator" value="," />
