@@ -46,7 +46,7 @@ class ClientsGroup(object):
 
         test_data = torch.tensor(mnistDataSet.test_data)
         test_label = torch.argmax(torch.tensor(mnistDataSet.test_label), dim=1)
-        self.test_data_loader = DataLoader(TensorDataset(test_data, test_label), batch_size=64, shuffle=True)
+        self.test_data_loader = DataLoader(TensorDataset(test_data, test_label), batch_size=64, shuffle=False)
 
         train_data = mnistDataSet.train_data
         train_label = mnistDataSet.train_label

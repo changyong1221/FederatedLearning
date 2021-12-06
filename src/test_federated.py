@@ -7,6 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import pandas as pd
 
+
 def create_model_mnist():
     model = Sequential()
     model.add(Dense(512, activation="relu", input_shape=(28*28,)))
@@ -16,7 +17,7 @@ def create_model_mnist():
 
 def train_one_model(client_id, epoch, batch_size, train, x_test, y_test):
     # process data
-    x_train, y_train = np.hsplit(train, [784,])
+    x_train, y_train = np.hsplit(train, [784, ])
 
     sub_model_dir = "../models/train"
     check_and_build_dir(sub_model_dir)

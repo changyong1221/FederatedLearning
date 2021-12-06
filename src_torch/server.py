@@ -11,7 +11,7 @@ from src_torch.clients import ClientsGroup, client
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="FedAvg")
 parser.add_argument('-g', '--gpu', type=str, default='0', help='gpu id to use(e.g. 0,1,2,3)')
-parser.add_argument('-nc', '--num_of_clients', type=int, default=10, help='numer of the clients')
+parser.add_argument('-nc', '--num_of_clients', type=int, default=1, help='numer of the clients')
 parser.add_argument('-cf', '--cfraction', type=float, default=1, help='C fraction, 0 means 1 client, 1 means total clients')
 parser.add_argument('-E', '--epoch', type=int, default=2, help='local train epoch')
 parser.add_argument('-B', '--batchsize', type=int, default=64, help='local train batch size')
@@ -57,7 +57,7 @@ if __name__=="__main__":
     testDataLoader = myClients.test_data_loader
 
     ## load parameters and test
-    is_test = True
+    is_test = False
     if is_test:
         with torch.no_grad():
             net.load_state_dict(torch.load("checkpoints/mnist_2nn_num_comm19_E2_B64_lr0.01_num_clients10_cf1.pkl"))
@@ -72,7 +72,6 @@ if __name__=="__main__":
             print('accuracy: {}'.format(sum_accu / num))
             print('test completed.')
             print('program exited.')
-            exit()
 
     # federated training
     num_in_comm = int(max(args['num_of_clients'] * args['cfraction'], 1))
