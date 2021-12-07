@@ -9,7 +9,7 @@ import torch
 
 
 class DataSet(object):
-    def __init__(self, clients_num, isIID):
+    def __init__(self, clients_num, is_iid):
         # whole data
         self.train_data = None
         self.train_label = None
@@ -20,9 +20,10 @@ class DataSet(object):
 
         self._index_in_train_epoch = 0
         self.clients_num = clients_num
-        self.mnist_dataset_construct(isIID)
+        self.is_iid = is_iid
+        self.mnist_dataset_construct()
 
-    def mnist_dataset_construct(self, isIID):
+    def mnist_dataset_construct(self):
         data_dir = '../datasets'
         train_images_path = os.path.join(data_dir, 'train-images-idx3-ubyte.gz')
         train_labels_path = os.path.join(data_dir, 'train-labels-idx1-ubyte.gz')
@@ -49,15 +50,12 @@ class DataSet(object):
         test_images = test_images.astype(np.float32)
         test_images = np.multiply(test_images, 1.0 / 255.0)
 
-        if isIID:
-            self.train_data = torch.tensor(train_images)
-            self.train_label = torch.argmax(torch.tensor(train_labels), dim=1)
-            # order = np.arange(self.train_data_size)
-            # np.random.shuffle(order)  # no shuffle
-            # self.train_data = train_images[order]
-            # self.train_label = train_labels[order]
+        if self.is_iid:
+            order = np.arange(self.train_data_size)
+            np.random.shuffle(order)
+            self.train_data = torch.tensor(train_images[order])
+            self.train_label = torch.argmax(torch.tensor(train_labels[order]), dim=1)
         else:
-            pass
             labels = np.argmax(train_labels, axis=1)
             order = np.argsort(labels)
             self.train_data = train_images[order]
@@ -75,20 +73,45 @@ class DataSet(object):
                self.train_label[batches_size*(client_id - 1):batches_size*client_id]
 
     def get_train_batch(self, client_id, train_batch_size):
-        batches_size = (int)(len(self.train_data) / self.clients_num)
-        client_train_data = self.train_data[batches_size*(client_id - 1):batches_size*client_id]
-        client_test_data = self.train_label[batches_size*(client_id - 1):batches_size*client_id]
-        client_test_data = torch.reshape(client_test_data, (-1, 1))
-        client_dataset = torch.concat([client_train_data, client_test_data], dim=1)
-        client_dataset_slice = random.sample(client_dataset.tolist(), train_batch_size)
-        client_dataset_slice = np.array(client_dataset_slice)
-        x_train, y_train = np.hsplit(client_dataset_slice, [784, ])
-        x_train = x_train.astype(np.float32)
-        y_train = y_train.flatten()
-        y_train = y_train.astype(np.int64)
-        x_train = torch.tensor(x_train)
-        y_train = torch.tensor(y_train)
-        return x_train, y_train
+        if self.is_iid:
+            batches_size = (int)(self.train_data_size / self.clients_num)
+            client_train_data = self.train_data[batches_size*(client_id - 1):batches_size*client_id]
+            client_test_data = self.train_label[batches_size*(client_id - 1):batches_size*client_id]
+            client_test_data = torch.reshape(client_test_data, (-1, 1))
+            client_dataset = torch.concat([client_train_data, client_test_data], dim=1)
+            client_dataset_slice = random.sample(client_dataset.tolist(), train_batch_size)
+            client_dataset_slice = np.array(client_dataset_slice)
+            x_train, y_train = np.hsplit(client_dataset_slice, [784, ])
+            x_train = x_train.astype(np.float32)
+            y_train = y_train.flatten()
+            y_train = y_train.astype(np.int64)
+            x_train = torch.tensor(x_train)
+            y_train = torch.tensor(y_train)
+            return x_train, y_train
+        else:
+            client_slice_num = 2
+            shard_size = self.train_data_size // self.clients_num // client_slice_num
+            shards_id = np.random.RandomState(seed=self.clients_num).permutation(self.train_data_size // shard_size)
+            shards_id1 = shards_id[(client_id - 1) * 2]
+            shards_id2 = shards_id[(client_id - 1) * 2 + 1]
+            data_shards1 = self.train_data[shards_id1 * shard_size: shards_id1 * shard_size + shard_size]
+            data_shards2 = self.train_data[shards_id2 * shard_size: shards_id2 * shard_size + shard_size]
+            label_shards1 = self.train_label[shards_id1 * shard_size: shards_id1 * shard_size + shard_size]
+            label_shards2 = self.train_label[shards_id2 * shard_size: shards_id2 * shard_size + shard_size]
+            local_data, local_label = np.vstack((data_shards1, data_shards2)), np.vstack((label_shards1, label_shards2))
+            client_train_data = local_data
+            client_test_data = np.argmax(local_label, axis=1)
+            client_test_data = np.reshape(client_test_data, (-1, 1))
+            client_dataset = np.concatenate([client_train_data, client_test_data], axis=1)
+            client_dataset_slice = random.sample(client_dataset.tolist(), train_batch_size)
+            client_dataset_slice = np.array(client_dataset_slice)
+            x_train, y_train = np.hsplit(client_dataset_slice, [784, ])
+            x_train = x_train.astype(np.float32)
+            y_train = y_train.flatten()
+            y_train = y_train.astype(np.int64)
+            x_train = torch.tensor(x_train)
+            y_train = torch.tensor(y_train)
+            return x_train, y_train
 
 
 def _read32(bytestream):
@@ -139,15 +162,5 @@ def extract_labels(filename):
 
 
 if __name__ == "__main__":
-    'test data set'
-    # mnistDataSet = DataSet('mnist', True)  # test NON-IID
-    # if type(mnistDataSet.train_data) is np.ndarray and type(mnistDataSet.test_data) is np.ndarray and \
-    #         type(mnistDataSet.train_label) is np.ndarray and type(mnistDataSet.test_label) is np.ndarray:
-    #     print('the type of data is numpy ndarray')
-    # else:
-    #     print('the type of data is not numpy ndarray')
-    # print('the shape of the train data set is {}'.format(mnistDataSet.train_data.shape))
-    # print('the shape of the test data set is {}'.format(mnistDataSet.test_data.shape))
-    # print(mnistDataSet.train_label[0:100], mnistDataSet.train_label[11000:11100])
     client_dataset = DataSet(10, True)
     train_data, train_labels = client_dataset.get_train_batch(1, 64*10)
