@@ -1,13 +1,14 @@
 from random import random
 
 from src_torch_distributed.get_data import DataSet
-from src_torch_distributed.net_core import Mnist_2NN
+from src_torch_distributed.net_core import Mnist_2NN, Mnist_CNN
 from src_torch_distributed.fed_core import FedClient, FedServer
 import torch.nn.functional as F
 from torch import optim
 from src_torch_distributed.utils import *
 import numpy as np
 import time
+import shutil
 
 # global settings
 clients_num = 10
@@ -24,14 +25,12 @@ def train_one_model(client_id):
     sub_model_path = f"../models/train/{client_id}.pkl"
     x_train, y_train = dataset.get_train_batch(client_id, batch_size*10)
 
-    model = FedClient(net=Mnist_2NN(), ID=client_id)
+    model = FedClient(net=Mnist_CNN(), ID=client_id)
     model.setJob(jobAdress="x3tg83jx0m4jf8chyp5djas4jf9")
     model.set_model_settings(loss_func=F.cross_entropy, optimizer=optim.SGD(model.net.parameters(), lr=learning_rate))
-    # global_model_path = "../models/global/global.pkl"
-    # if os.path.exists(global_model_path):
-    #     model.load_model(global_model_path, weight=True)
-    if os.path.exists(sub_model_path):
-        model.load_model(sub_model_path, weight=True)
+    global_model_path = "../models/global/global.pkl"
+    if os.path.exists(global_model_path):
+        model.load_model(global_model_path, weight=True)
     loss = model.train(x_train, y_train, epoch, batch_size)
     acc = model.evaluate(x_test, y_test, batch_size)
 
@@ -43,8 +42,8 @@ def train_one_model(client_id):
 
 
 def test_one_model():
-    sub_model_path = "../models/global/global.pkl"
-    client_model = FedClient(net=Mnist_2NN(), ID=client_id)
+    sub_model_path = "../models/global/global_model.pkl"
+    client_model = FedClient(net=Mnist_CNN(), ID=client_id)
     client_model.load_model(sub_model_path, weight=True)
     acc = client_model.evaluate(x_test, y_test, batch_size)
     print(f'client({client_id})_acc:{acc}')
@@ -62,7 +61,7 @@ def test_federated_model():
         sub_model_paths.append(path)
     # print(f"mean of sub_model_acc: {np.mean(sub_model_acc)}")
 
-    global_model = FedServer(net=Mnist_2NN())
+    global_model = FedServer(net=Mnist_CNN())
 
     global_model.load_client_weights(sub_model_paths)
     global_model.fed_avg()
@@ -71,7 +70,7 @@ def test_federated_model():
 
     global_model_dir = "../models/global"
     check_and_build_dir(global_model_dir)
-    global_model_path = f"{global_model_dir}/global.pkl"
+    global_model_path = f"{global_model_dir}/global_model.pkl"
     global_model.save_model(global_model_path, weight=True)
     return acc
 
@@ -79,7 +78,7 @@ def test_federated_model():
 def test_federated():
     # initialization
     start_time = time.time()
-    federated_rounds = 1000
+    federated_rounds = 1
     init_federated_model()
 
     # federated main
@@ -110,11 +109,15 @@ def test_federated():
 
 
 def init_federated_model():
-    global_model = FedServer(net=Mnist_2NN())
-    global_model_dir = "../models/global"
-    check_and_build_dir(global_model_dir)
-    global_model_path = f"{global_model_dir}/global.pkl"
-    global_model.save_model(global_model_path, weight=True)
+    source_path = "../initial_model/global_model.pkl"
+    dest_path = "../models/global/global.pkl"
+    shutil.copyfile(source_path, dest_path)
+
+    # global_model = FedServer(net=Mnist_CNN())
+    # global_model_dir = "../models/global"
+    # check_and_build_dir(global_model_dir)
+    # global_model_path = f"{global_model_dir}/global_model.pkl"
+    # global_model.save_model(global_model_path, weight=True)
 
 
 def train_one_model_roundly(client_id, rounds):
@@ -173,8 +176,9 @@ def train_one_model_roundly(client_id, rounds):
 
 
 if __name__ == '__main__':
-    # test_federated()
-    # train_one_model()
+    test_federated()
+    # init_federated_model()
+    # train_one_model(1)
     # test_one_model()
     # test_federated_model(10)
 
@@ -187,6 +191,6 @@ if __name__ == '__main__':
     #     test_federated_model(i + 1)
 
     # train one model 1000 rounds
-    train_one_model_roundly(1, 1000)
+    # train_one_model_roundly(1, 1000)
 
 

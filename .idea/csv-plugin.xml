@@ -108,6 +108,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="\src_torch_distributed\fed_core.py">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\src_torch_distributed\get_data.py">
           <value>
             <Attribute>
@@ -119,6 +126,13 @@
           <value>
             <Attribute>
               <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
+        <entry key="\test\generate_pic.py">
+          <value>
+            <Attribute>
+              <option name="separator" value=":" />
             </Attribute>
           </value>
         </entry>

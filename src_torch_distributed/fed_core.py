@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
+from tensorflow_privacy.privacy.analysis.compute_noise_from_budget_lib import compute_noise
 
 
 class BaseModel:
@@ -10,6 +11,14 @@ class BaseModel:
         self.weights = None
         self.loss_func = None
         self.optimizer = None
+        self.clip = 12      # 裁剪系数
+        self.q = 0.05
+        self.eps = 16
+        self.delta = 1e-4
+        self.tot_T = 10
+        self.E = 100
+        self.sigma = compute_noise(1, self.q, self.eps, self.E*self.tot_T, self.delta, 1e-5)      # 高斯分布系数
+
         self.dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     def load_model(self, file_path, weight=False):
@@ -32,9 +41,22 @@ class BaseModel:
                 data, label = data.to(self.dev), label.to(self.dev)
                 preds = self.net(data)
                 loss = self.loss_func(preds, label)
-                loss.backward()
-                self.optimizer.step()
+
+                # clipped_grads = {name: torch.zeros_like(param) for name, param in self.net.named_parameters()}
                 self.optimizer.zero_grad()
+
+                loss.backward()
+                # torch.nn.utils.clip_grad_norm_(self.net.parameters(), max_norm=self.clip)
+                # for name, param in self.net.named_parameters():
+                #     clipped_grads[name] += param.grad
+                # self.net.zero_grad()
+                # # add gaussian noise
+                # for name, param in self.net.named_parameters():
+                #     clipped_grads[name] += torch.normal(0, self.sigma*self.clip, clipped_grads[name].shape).to(self.dev)
+                # for name, param in self.net.named_parameters():
+                #     param.grad = clipped_grads[name]
+
+                self.optimizer.step()
                 if epoch == epoches - 1:
                     num += 1
                     train_loss += float(loss.item())
