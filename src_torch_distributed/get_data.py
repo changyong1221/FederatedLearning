@@ -1,5 +1,5 @@
 import random
-
+from torchvision import datasets, transforms
 import numpy as np
 import gzip
 import os
@@ -18,10 +18,59 @@ class DataSet(object):
         self.test_label = None
         self.test_data_size = None
 
-        self._index_in_train_epoch = 0
         self.clients_num = clients_num
         self.is_iid = is_iid
-        self.mnist_dataset_construct()
+        # self.mnist_dataset_construct()
+
+        # 加载mnist数据集
+        data_train = datasets.MNIST(root="../datasets/", download=False, train=True, transform=transforms.Compose([
+                           transforms.ToTensor(),
+                           transforms.Normalize((0.1307,), (0.3081,))
+                       ]))
+
+        data_test = datasets.MNIST(root="../datasets/", download=False, train=False, transform=transforms.Compose([
+                           transforms.ToTensor(),
+                           transforms.Normalize((0.1307,), (0.3081,))
+                       ]))
+
+        # split MNIST (training set) into non-iid data sets
+        self.client_non_iid = []
+        user_dict = self.mnist_noniid(data_train, clients_num)
+        for i in range(clients_num):
+            idx = user_dict[i]
+            d = data_train.data[idx].float().unsqueeze(1)
+            targets = data_train.targets[idx].float()
+            self.client_non_iid.append((d, targets))
+        self.test_data = data_test.data.float().unsqueeze(1)
+        self.test_label = data_test.targets.float()
+
+    def mnist_noniid(self, dataset, num_users):
+        """
+        Sample non-I.I.D client data from MNIST dataset
+        :param dataset:
+        :param num_users:
+        :return:
+        """
+        # num_shards, num_imgs = 30, 2000
+        num_shards = int(num_users * 2)
+        num_imgs = int(60000 / num_shards)
+        idx_shard = [i for i in range(num_shards)]
+        dict_users = {i: np.array([], dtype='int64') for i in range(num_users)}
+        idxs = np.arange(num_shards * num_imgs)
+        labels = dataset.targets.numpy()
+
+        # sort labels
+        idxs_labels = np.vstack((idxs, labels))
+        idxs_labels = idxs_labels[:, idxs_labels[1, :].argsort()]
+        idxs = idxs_labels[0, :]
+
+        # divide and assign
+        for i in range(num_users):
+            rand_set = set(np.random.choice(idx_shard, 2, replace=False))
+            idx_shard = list(set(idx_shard) - rand_set)
+            for rand in rand_set:
+                dict_users[i] = np.concatenate((dict_users[i], idxs[rand * num_imgs:(rand + 1) * num_imgs]), axis=0)
+        return dict_users
 
     def mnist_dataset_construct(self):
         data_dir = '../datasets'
@@ -73,45 +122,47 @@ class DataSet(object):
                self.train_label[batches_size*(client_id - 1):batches_size*client_id]
 
     def get_train_batch(self, client_id, train_batch_size):
-        if self.is_iid:
-            batches_size = (int)(self.train_data_size / self.clients_num)
-            client_train_data = self.train_data[batches_size*(client_id - 1):batches_size*client_id]
-            client_test_data = self.train_label[batches_size*(client_id - 1):batches_size*client_id]
-            client_test_data = torch.reshape(client_test_data, (-1, 1))
-            client_dataset = torch.concat([client_train_data, client_test_data], dim=1)
-            client_dataset_slice = random.sample(client_dataset.tolist(), train_batch_size)
-            client_dataset_slice = np.array(client_dataset_slice)
-            x_train, y_train = np.hsplit(client_dataset_slice, [784, ])
-            x_train = x_train.astype(np.float32)
-            y_train = y_train.flatten()
-            y_train = y_train.astype(np.int64)
-            x_train = torch.tensor(x_train)
-            y_train = torch.tensor(y_train)
-            return x_train, y_train
-        else:
-            client_slice_num = 2
-            shard_size = self.train_data_size // self.clients_num // client_slice_num
-            shards_id = np.random.RandomState(seed=self.clients_num).permutation(self.train_data_size // shard_size)
-            shards_id1 = shards_id[(client_id - 1) * 2]
-            shards_id2 = shards_id[(client_id - 1) * 2 + 1]
-            data_shards1 = self.train_data[shards_id1 * shard_size: shards_id1 * shard_size + shard_size]
-            data_shards2 = self.train_data[shards_id2 * shard_size: shards_id2 * shard_size + shard_size]
-            label_shards1 = self.train_label[shards_id1 * shard_size: shards_id1 * shard_size + shard_size]
-            label_shards2 = self.train_label[shards_id2 * shard_size: shards_id2 * shard_size + shard_size]
-            local_data, local_label = np.vstack((data_shards1, data_shards2)), np.vstack((label_shards1, label_shards2))
-            client_train_data = local_data
-            client_test_data = np.argmax(local_label, axis=1)
-            client_test_data = np.reshape(client_test_data, (-1, 1))
-            client_dataset = np.concatenate([client_train_data, client_test_data], axis=1)
-            client_dataset_slice = random.sample(client_dataset.tolist(), train_batch_size)
-            client_dataset_slice = np.array(client_dataset_slice)
-            x_train, y_train = np.hsplit(client_dataset_slice, [784, ])
-            x_train = x_train.astype(np.float32)
-            y_train = y_train.flatten()
-            y_train = y_train.astype(np.int64)
-            x_train = torch.tensor(x_train)
-            y_train = torch.tensor(y_train)
-            return x_train, y_train
+        return self.client_non_iid[client_id][0], self.client_non_iid[client_id][1]
+    # def get_train_batch(self, client_id, train_batch_size):
+    #     if self.is_iid:
+    #         batches_size = (int)(self.train_data_size / self.clients_num)
+    #         client_train_data = self.train_data[batches_size*(client_id - 1):batches_size*client_id]
+    #         client_test_data = self.train_label[batches_size*(client_id - 1):batches_size*client_id]
+    #         client_test_data = torch.reshape(client_test_data, (-1, 1))
+    #         client_dataset = torch.concat([client_train_data, client_test_data], dim=1)
+    #         client_dataset_slice = random.sample(client_dataset.tolist(), train_batch_size)
+    #         client_dataset_slice = np.array(client_dataset_slice)
+    #         x_train, y_train = np.hsplit(client_dataset_slice, [784, ])
+    #         x_train = x_train.astype(np.float32)
+    #         y_train = y_train.flatten()
+    #         y_train = y_train.astype(np.int64)
+    #         x_train = torch.tensor(x_train)
+    #         y_train = torch.tensor(y_train)
+    #         return x_train, y_train
+    #     else:
+    #         client_slice_num = 2
+    #         shard_size = self.train_data_size // self.clients_num // client_slice_num
+    #         shards_id = np.random.RandomState(seed=self.clients_num).permutation(self.train_data_size // shard_size)
+    #         shards_id1 = shards_id[(client_id - 1) * 2]
+    #         shards_id2 = shards_id[(client_id - 1) * 2 + 1]
+    #         data_shards1 = self.train_data[shards_id1 * shard_size: shards_id1 * shard_size + shard_size]
+    #         data_shards2 = self.train_data[shards_id2 * shard_size: shards_id2 * shard_size + shard_size]
+    #         label_shards1 = self.train_label[shards_id1 * shard_size: shards_id1 * shard_size + shard_size]
+    #         label_shards2 = self.train_label[shards_id2 * shard_size: shards_id2 * shard_size + shard_size]
+    #         local_data, local_label = np.vstack((data_shards1, data_shards2)), np.vstack((label_shards1, label_shards2))
+    #         client_train_data = local_data
+    #         client_test_data = np.argmax(local_label, axis=1)
+    #         client_test_data = np.reshape(client_test_data, (-1, 1))
+    #         client_dataset = np.concatenate([client_train_data, client_test_data], axis=1)
+    #         client_dataset_slice = random.sample(client_dataset.tolist(), train_batch_size)
+    #         client_dataset_slice = np.array(client_dataset_slice)
+    #         x_train, y_train = np.hsplit(client_dataset_slice, [784, ])
+    #         x_train = x_train.astype(np.float32)
+    #         y_train = y_train.flatten()
+    #         y_train = y_train.astype(np.int64)
+    #         x_train = torch.tensor(x_train)
+    #         y_train = torch.tensor(y_train)
+    #         return x_train, y_train
 
 
 def _read32(bytestream):
@@ -163,4 +214,9 @@ def extract_labels(filename):
 
 if __name__ == "__main__":
     client_dataset = DataSet(10, True)
+    # test_data, test_labels = client_dataset.get_test_dataset()
     train_data, train_labels = client_dataset.get_train_batch(1, 64*10)
+    print("type(train_data): ", type(train_data))
+    print("type(train_labels): ", type(train_labels))
+    print("len(train_data): ", len(train_data))
+    print("len(train_labels): ", len(train_labels))

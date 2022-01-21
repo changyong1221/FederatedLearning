@@ -17,7 +17,7 @@ class BaseModel:
         self.delta = 1e-4
         self.tot_T = 10
         self.E = 100
-        self.sigma = compute_noise(1, self.q, self.eps, self.E*self.tot_T, self.delta, 1e-5)      # 高斯分布系数
+        # self.sigma = compute_noise(1, self.q, self.eps, self.E*self.tot_T, self.delta, 1e-5)      # 高斯分布系数
 
         self.dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -33,14 +33,22 @@ class BaseModel:
         self.optimizer = optimizer
 
     def train(self, train_data, train_labels, epoches, batch_size):
-        train_dl = DataLoader(TensorDataset(train_data, train_labels), batch_size=batch_size, shuffle=True)
+        idx = np.where(np.random.rand(len(train_data)) < self.q)[0]
+        sampled_dataset = TensorDataset(train_data[idx], train_labels[idx])
+        train_dl = DataLoader(
+            dataset=sampled_dataset,
+            batch_size=batch_size,
+            shuffle=True
+        )
+
+        # train_dl = DataLoader(TensorDataset(train_data, train_labels), batch_size=batch_size, shuffle=True)
         train_loss = 0
         num = 0
         for epoch in range(epoches):
             for data, label in train_dl:
                 data, label = data.to(self.dev), label.to(self.dev)
-                preds = self.net(data)
-                loss = self.loss_func(preds, label)
+                preds = self.net(data.float())
+                loss = self.loss_func(preds, label.long())
 
                 # clipped_grads = {name: torch.zeros_like(param) for name, param in self.net.named_parameters()}
                 self.optimizer.zero_grad()
@@ -130,6 +138,17 @@ class FedServer(BaseModel):
         for var in self.clients_weights_sum:
             self.global_weights[var] = (self.clients_weights_sum[var] / self.clients_num)
         self.net.load_state_dict(self.global_weights, strict=True)
+
+    def evaluate(self, test_data, test_labels):
+        self.net.eval()
+        correct = 0
+        tot_sample = 0
+        t_pred_y = self.net(test_data)
+        _, predicted = torch.max(t_pred_y, 1)
+        correct += (predicted == test_labels).sum().item()
+        tot_sample += test_labels.size(0)
+        acc = correct / tot_sample
+        return acc
 
     def setJob(self, jobAdress):
         pass
