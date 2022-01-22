@@ -43,11 +43,11 @@ def train_one_model(client_id):
 
 
 def test_one_model():
-    sub_model_path = "../models/global/global_model.pkl"
-    client_model = FedClient(net=MnistCNN(), ID=client_id)
-    client_model.load_model(sub_model_path, weight=True)
-    acc = client_model.evaluate(x_test, y_test, batch_size)
-    print(f'client({client_id})_acc:{acc}')
+    sub_model_path = "../models/global/global.pkl"
+    server_model = FedServer(net=MnistCNN())
+    server_model.load_model(sub_model_path, weight=True)
+    acc = server_model.evaluate(x_test, y_test)
+    print(f'model_acc:{acc}')
 
 
 def test_federated_model():
@@ -66,13 +66,15 @@ def test_federated_model():
 
     global_model.load_client_weights(sub_model_paths)
     global_model.fed_avg()
-    acc = global_model.evaluate(x_test, y_test)
-    print(f'clients_num:{clients_num}, global_acc:{acc}')
 
     global_model_dir = "../models/global"
     check_and_build_dir(global_model_dir)
     global_model_path = f"{global_model_dir}/global.pkl"
     global_model.save_model(global_model_path, weight=True)
+
+    acc = global_model.evaluate(x_test, y_test)
+    print(f'clients_num:{clients_num}, global_acc:{acc}')
+
     return acc
 
 

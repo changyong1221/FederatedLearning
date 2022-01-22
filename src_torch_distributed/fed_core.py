@@ -18,6 +18,7 @@ class BaseModel:
         self.tot_T = 10
         self.E = 100
         # self.sigma = compute_noise(1, self.q, self.eps, self.E*self.tot_T, self.delta, 1e-5)      # 高斯分布系数
+        self.sigma = 2.4895
 
         self.dev = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
@@ -33,41 +34,42 @@ class BaseModel:
         self.optimizer = optimizer
 
     def train(self, train_data, train_labels, epoches, batch_size):
-        idx = np.where(np.random.rand(len(train_data)) < self.q)[0]
-        sampled_dataset = TensorDataset(train_data[idx], train_labels[idx])
-        train_dl = DataLoader(
-            dataset=sampled_dataset,
-            batch_size=batch_size,
-            shuffle=True
-        )
-
-        # train_dl = DataLoader(TensorDataset(train_data, train_labels), batch_size=batch_size, shuffle=True)
+        self.net.train()
         train_loss = 0
         num = 0
         for epoch in range(epoches):
+            # train_dl = DataLoader(TensorDataset(train_data, train_labels), batch_size=batch_size, shuffle=True)
+
+            idx = np.where(np.random.rand(len(train_data)) < self.q)[0]
+            sampled_dataset = TensorDataset(train_data[idx], train_labels[idx])
+            train_dl = DataLoader(
+                dataset=sampled_dataset,
+                batch_size=batch_size,
+                shuffle=True
+            )
+            clipped_grads = {name: torch.zeros_like(param) for name, param in self.net.named_parameters()}
+            self.optimizer.zero_grad()
+
             for data, label in train_dl:
                 data, label = data.to(self.dev), label.to(self.dev)
                 preds = self.net(data.float())
                 loss = self.loss_func(preds, label.long())
 
-                # clipped_grads = {name: torch.zeros_like(param) for name, param in self.net.named_parameters()}
-                self.optimizer.zero_grad()
-
                 loss.backward()
-                # torch.nn.utils.clip_grad_norm_(self.net.parameters(), max_norm=self.clip)
-                # for name, param in self.net.named_parameters():
-                #     clipped_grads[name] += param.grad
-                # self.net.zero_grad()
-                # # add gaussian noise
-                # for name, param in self.net.named_parameters():
-                #     clipped_grads[name] += torch.normal(0, self.sigma*self.clip, clipped_grads[name].shape).to(self.dev)
-                # for name, param in self.net.named_parameters():
-                #     param.grad = clipped_grads[name]
+                torch.nn.utils.clip_grad_norm_(self.net.parameters(), max_norm=self.clip)
+                for name, param in self.net.named_parameters():
+                    clipped_grads[name] += param.grad
+                self.net.zero_grad()
+            # add gaussian noise
+            for name, param in self.net.named_parameters():
+                clipped_grads[name] += torch.normal(0, self.sigma*self.clip, clipped_grads[name].shape).to(self.dev)
+            for name, param in self.net.named_parameters():
+                param.grad = clipped_grads[name]
 
-                self.optimizer.step()
-                if epoch == epoches - 1:
-                    num += 1
-                    train_loss += float(loss.item())
+            self.optimizer.step()
+            if epoch == epoches - 1:
+                num += 1
+                train_loss += float(loss.item())
         return train_loss / num
 
     def save_model(self, save_path, weight=False):
@@ -77,6 +79,7 @@ class BaseModel:
             torch.save(self.net, save_path)
 
     def evaluate(self, test_data, test_labels, batch_size):
+        self.net.eval()
         test_data_loader = DataLoader(TensorDataset(test_data, test_labels), batch_size=batch_size, shuffle=False)
         with torch.no_grad():
             sum_accu = 0
