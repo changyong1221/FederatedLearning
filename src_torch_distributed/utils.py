@@ -107,3 +107,55 @@ def save_to_pic(data_dir, dest_dir, plt_config):
     plt.plot(x_axis_data, y_axis_data)
     plt.savefig(dest_dir)
     plt.close()
+
+
+def train_one_model_roundly(client_id, rounds):
+    check_and_build_dir("../models/train")
+    sub_model_path = f"../models/train/{client_id}.pkl"
+    client_loss_list = []
+    client_acc_list = []
+
+    for iter in range(rounds):
+        x_train, y_train = dataset.get_train_batch(client_id)
+
+        model = FedClient()
+        if os.path.exists(sub_model_path):
+            model.load_model(sub_model_path)
+        loss = model.train(x_train, y_train, epoch)
+        acc = model.evaluate(x_test, y_test)
+
+        model.save_model(sub_model_path, weight=True)
+        client_loss_list.append(round(loss, 4))
+        client_acc_list.append(round(acc, 4))
+        print(f"Round {iter}: loss:{loss}, acc:{acc}")
+    print("training done.")
+
+    # save results
+    client_dir = f"../results/clients/client_{client_id}"
+    check_and_build_dir(client_dir)
+    save_to_file(f"{client_dir}/client_{client_id}_loss.txt", client_loss_list)
+    save_to_file(f"{client_dir}/client_{client_id}_acc.txt", client_acc_list)
+    print("all results have been saved.")
+
+    # save pictures
+    plt_config = {
+        "title" : "",
+        "xlabel" : "federated rounds",
+        "ylabel" : "",
+    }
+    # 1. process loss data
+    client_loss_file_path = f"{client_dir}/client_{client_id}_loss.txt"
+    client_pic_dir = f"../pic/clients/client_{client_id}"
+    check_and_build_dir(client_pic_dir)
+    client_loss_pic_path = f"{client_pic_dir}/client_{client_id}_loss.png"
+    plt_config["title"] = f"loss of client-{client_id}"
+    plt_config["ylabel"] = "loss"
+    save_to_pic(client_loss_file_path, client_loss_pic_path, plt_config)
+
+    # 2. process acc data
+    client_acc_file_path = f"{client_dir}/client_{client_id}_acc.txt"
+    client_acc_pic_path = f"{client_pic_dir}/client_{client_id}_acc.png"
+    plt_config["title"] = f"accuracy of client-{client_id}"
+    plt_config["ylabel"] = "acc"
+    save_to_pic(client_acc_file_path, client_acc_pic_path, plt_config)
+    print("all pictures have been saved.")

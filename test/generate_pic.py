@@ -9,7 +9,7 @@ def generate_pic():
     diff_num = records_num // 10
     for i in range(diff_num):
         data = data.append(data[i * 10: i * 10 + 1])
-    data = data[-208:]
+    data = data[-193:]
     dest_dir = "./global_acc.png"
     plt_config = {
         "title": "accuracy of global model",
@@ -47,5 +47,5 @@ def save_to_pic(data, dest_dir, plt_config):
 
 
 if __name__ == "__main__":
-    # generate_pic()
-    generate_pic_local()
+    generate_pic()
+    # generate_pic_local()

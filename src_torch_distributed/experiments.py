@@ -1,42 +1,35 @@
 from random import random
-
 from src_torch_distributed.get_data import DataSet
-from src_torch_distributed.net_core import Mnist_2NN, Mnist_CNN, MnistCNN
 from src_torch_distributed.fed_core import FedClient, FedServer
-import torch.nn.functional as F
-from torch import optim
 from src_torch_distributed.utils import *
 import numpy as np
 import time
 import shutil
 
+import warnings
+warnings.filterwarnings("ignore")
+
 # global settings
 clients_num = 10
-client_id = 1
 epoch = 1
-batch_size = 64
-learning_rate = 0.01
-dataset = DataSet(clients_num, False)
+dataset = DataSet(clients_num)
 x_test, y_test = dataset.get_test_dataset()
 
 
 def train_one_model(client_id):
     check_and_build_dir("../models/train")
     sub_model_path = f"../models/train/{client_id}.pkl"
-    x_train, y_train = dataset.get_train_batch(client_id, batch_size)
+    client_dataset = dataset.get_train_batch(client_id)
 
-    model = FedClient(net=MnistCNN(), ID=client_id)
-    model.setJob(jobAdress="x3tg83jx0m4jf8chyp5djas4jf9")
-    model.set_model_settings(loss_func=F.cross_entropy, optimizer=optim.SGD(model.net.parameters(), lr=learning_rate))
+    model = FedClient()
     global_model_path = "../models/global/global.pkl"
     if os.path.exists(global_model_path):
-        model.load_model(global_model_path, weight=True)
-    loss = model.train(x_train, y_train, epoch, batch_size)
+        model.load_model(global_model_path)
+    loss = model.train(client_dataset, epoch)
     # acc = model.evaluate(x_test, y_test, batch_size)
     acc = 0
 
-    model.save_model(sub_model_path, weight=True)
-    model.upload()
+    model.save_model(sub_model_path)
     # print(f"Client-ID:{client_id}, loss:{loss}, acc:{acc}")
     # print("training done.")
     return loss, acc
@@ -44,8 +37,8 @@ def train_one_model(client_id):
 
 def test_one_model():
     sub_model_path = "../models/global/global.pkl"
-    server_model = FedServer(net=MnistCNN())
-    server_model.load_model(sub_model_path, weight=True)
+    server_model = FedServer()
+    server_model.load_model(sub_model_path)
     acc = server_model.evaluate(x_test, y_test)
     print(f'model_acc:{acc}')
 
@@ -62,19 +55,16 @@ def test_federated_model():
         sub_model_paths.append(path)
     # print(f"mean of sub_model_acc: {np.mean(sub_model_acc)}")
 
-    global_model = FedServer(net=MnistCNN())
-
-    global_model.load_client_weights(sub_model_paths)
-    global_model.fed_avg()
+    global_model = FedServer()
+    global_model.fed_avg(sub_model_paths)
 
     global_model_dir = "../models/global"
     check_and_build_dir(global_model_dir)
     global_model_path = f"{global_model_dir}/global.pkl"
-    global_model.save_model(global_model_path, weight=True)
+    global_model.save_model(global_model_path)
 
     acc = global_model.evaluate(x_test, y_test)
     print(f'clients_num:{clients_num}, global_acc:{acc}')
-
     return acc
 
 
@@ -113,69 +103,15 @@ def test_federated():
 
 def init_federated_model():
     source_path = "../initial_model/global_model.pkl"
+    check_and_build_dir("../models/global")
     dest_path = "../models/global/global.pkl"
     shutil.copyfile(source_path, dest_path)
 
-    # init_model = FedServer(net=MnistCNN())
+    # init_model = FedServer()
     # init_model_dir = "../initial_model"
     # check_and_build_dir(init_model_dir)
     # init_model_path = f"{init_model_dir}/global_model.pkl"
-    # init_model.save_model(init_model_path, weight=True)
-
-
-def train_one_model_roundly(client_id, rounds):
-    check_and_build_dir("../models/train")
-    sub_model_path = f"../models/train/{client_id}.pkl"
-    client_loss_list = []
-    client_acc_list = []
-
-    for iter in range(rounds):
-        x_train, y_train = dataset.get_train_batch(client_id, batch_size*10)
-
-        model = FedClient(net=MnistCNN(), ID=client_id)
-        model.setJob(jobAdress="x3tg83jx0m4jf8chyp5djas4jf9")
-        model.set_model_settings(loss_func=F.cross_entropy, optimizer=optim.SGD(model.net.parameters(), lr=learning_rate))
-        if os.path.exists(sub_model_path):
-            model.load_model(sub_model_path, weight=True)
-        loss = model.train(x_train, y_train, epoch, batch_size)
-        acc = model.evaluate(x_test, y_test, batch_size)
-
-        model.save_model(sub_model_path, weight=True)
-        model.upload()
-        client_loss_list.append(round(loss, 4))
-        client_acc_list.append(round(acc, 4))
-        print(f"Round {iter}: loss:{loss}, acc:{acc}")
-    print("training done.")
-
-    # save results
-    client_dir = f"../results/clients/client_{client_id}"
-    check_and_build_dir(client_dir)
-    save_to_file(f"{client_dir}/client_{client_id}_loss.txt", client_loss_list)
-    save_to_file(f"{client_dir}/client_{client_id}_acc.txt", client_acc_list)
-    print("all results have been saved.")
-
-    # save pictures
-    plt_config = {
-        "title" : "",
-        "xlabel" : "federated rounds",
-        "ylabel" : "",
-    }
-    # 1. process loss data
-    client_loss_file_path = f"{client_dir}/client_{client_id}_loss.txt"
-    client_pic_dir = f"../pic/clients/client_{client_id}"
-    check_and_build_dir(client_pic_dir)
-    client_loss_pic_path = f"{client_pic_dir}/client_{client_id}_loss.png"
-    plt_config["title"] = f"loss of client-{client_id}"
-    plt_config["ylabel"] = "loss"
-    save_to_pic(client_loss_file_path, client_loss_pic_path, plt_config)
-
-    # 2. process acc data
-    client_acc_file_path = f"{client_dir}/client_{client_id}_acc.txt"
-    client_acc_pic_path = f"{client_pic_dir}/client_{client_id}_acc.png"
-    plt_config["title"] = f"accuracy of client-{client_id}"
-    plt_config["ylabel"] = "acc"
-    save_to_pic(client_acc_file_path, client_acc_pic_path, plt_config)
-    print("all pictures have been saved.")
+    # init_model.save_model(init_model_path)
 
 
 if __name__ == '__main__':
@@ -195,5 +131,3 @@ if __name__ == '__main__':
 
     # train one model 1000 rounds
     # train_one_model_roundly(1, 1000)
-
-
