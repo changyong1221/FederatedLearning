@@ -1,7 +1,7 @@
 from random import random
-from src_torch_distributed.get_data import DataSet
-from src_torch_distributed.fed_core import FedClient, FedServer
-from src_torch_distributed.utils import *
+from get_data import DataSet
+from fed_core import FedClient, FedServer
+from utils import *
 import numpy as np
 import time
 import shutil

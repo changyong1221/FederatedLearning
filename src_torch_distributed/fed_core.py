@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from tensorflow_privacy.privacy.analysis.compute_noise_from_budget_lib import compute_noise
-from src_torch_distributed.net_core import MnistCNN
+from net_core import MnistCNN
 import torch.nn.functional as F
 from torch import optim
 import copy
@@ -14,21 +14,33 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 dev = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
+learning_rate = 0.01
+clip = 32      # 裁剪系数
+E = 1
+q = 0.03
+eps = 1
+delta = 1e-5
+tot_T = 100
+batch_size = 128
+# DP-SGD with sampling rate = 3% and noise_multiplier = 1.0180295400464534 iterated over 5000 steps satisfies differential privacy with eps = 16 and delta = 1e-05.
+sigma = compute_noise(1, q, eps, E*tot_T, delta, 1e-5)      # 高斯分布系数
+        
+
 class FedClient(nn.Module):
     def __init__(self):
         super(FedClient, self).__init__()
         self.model = MnistCNN().to(dev)
-        self.learning_rate = 0.01
-        self.clip = 32      # 裁剪系数
-        self.E = 1
-        self.q = 0.03
-        self.eps = 16.0
-        self.delta = 1e-5
-        self.tot_T = 100
-        self.batch_size = 128
+        self.learning_rate = learning_rate
+        self.clip = clip      # 裁剪系数
+        self.E = E
+        self.q = q
+        self.eps = eps
+        self.delta = delta
+        self.tot_T = tot_T
+        self.batch_size = batch_size
         # DP-SGD with sampling rate = 3% and noise_multiplier = 1.0180295400464534 iterated over 5000 steps satisfies differential privacy with eps = 16 and delta = 1e-05.
-        # self.sigma = compute_noise(1, self.q, self.eps, self.E*self.tot_T, self.delta, 1e-5)      # 高斯分布系数
-        self.sigma = 0.9054
+        self.sigma = sigma      # 高斯分布系数
+        # self.sigma = 0.9054
 
     def train(self, client_dataset, epoches):
         loss_func = F.cross_entropy
