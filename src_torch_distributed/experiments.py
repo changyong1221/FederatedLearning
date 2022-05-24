@@ -15,6 +15,8 @@ epoch = 1
 dataset = DataSet(clients_num)
 x_test, y_test = dataset.get_test_dataset()
 
+accu_data_list = [0 for i in range(clients_num)]
+merge_round_list = [0 for i in range(clients_num)]
 
 def train_one_model(client_id):
     check_and_build_dir("../models/train")
@@ -25,9 +27,13 @@ def train_one_model(client_id):
     global_model_path = "../models/global/global.pkl"
     if os.path.exists(global_model_path):
         model.load_model(global_model_path)
-    loss = model.train(client_dataset, epoch)
+    n_data = model.train(client_dataset, epoch, client_id)
+    print(f"client-{client_id}: {n_data}")
+
     # acc = model.evaluate(x_test, y_test, batch_size)
     acc = 0
+    loss = 0
+    accu_data_list[client_id] = n_data
 
     model.save_model(sub_model_path)
     # print(f"Client-ID:{client_id}, loss:{loss}, acc:{acc}")
@@ -43,20 +49,24 @@ def test_one_model():
     print(f'model_acc:{acc}')
 
 
-def test_federated_model():
+def test_federated_model(cur_client_list, merge_round_list):
     sub_model_paths = []
     sub_model_acc = []
-    for i in range(clients_num):
-        path = f"../models/train/{i}.pkl"
+    # for i in range(clients_num):
+    #     path = f"../models/train/{i}.pkl"
         # client_model = FedClient(net=Mnist_2NN(), ID=client_id)
         # client_model.load_model(path, weight=True)
         # acc = client_model.evaluate(x_test, y_test, batch_size)
         # sub_model_acc.append(acc)
-        sub_model_paths.append(path)
+        # sub_model_paths.append(path)
     # print(f"mean of sub_model_acc: {np.mean(sub_model_acc)}")
 
+    for client_id in cur_client_list:
+        path = f"../models/train/{client_id}.pkl"
+        sub_model_paths.append(path)
+    
     global_model = FedServer()
-    global_model.fed_avg(sub_model_paths)
+    global_model.fed_avg(sub_model_paths, accu_data_list, cur_client_list, merge_round_list)
 
     global_model_dir = "../models/global"
     check_and_build_dir(global_model_dir)
@@ -71,7 +81,7 @@ def test_federated_model():
 def test_federated():
     # initialization
     start_time = time.time()
-    federated_rounds = 100
+    federated_rounds = 400
     init_federated_model()
 
     # federated main
@@ -84,7 +94,12 @@ def test_federated():
         print(f"Round {epoch + 1}:")
         clients_loss_sum = 0
         clients_acc_sum = 0
+        cur_client_list = []
+        epoch = epoch % 10
         for client_id in range(clients_num):
+            # if client_id < epoch: continue
+            merge_round_list[client_id] += 1
+            cur_client_list.append(client_id)
             client_loss, client_acc = train_one_model(client_id)
             clients_loss_list[client_id].append(round(client_loss, 4))
             clients_acc_list[client_id].append(round(client_acc, 4))
@@ -92,7 +107,10 @@ def test_federated():
             clients_acc_sum += client_acc
         clients_avg_loss_list.append(clients_loss_sum / clients_num)
         clients_avg_acc_list.append(clients_acc_sum / clients_num)
-        global_acc = test_federated_model()
+        print(f"accu_data_list: {accu_data_list}")
+        print(f"merge_round_list: {merge_round_list}")
+
+        global_acc = test_federated_model(cur_client_list, merge_round_list)
         global_acc_list.append(round(global_acc, 4))
     save_results(clients_loss_list, clients_acc_list, clients_avg_loss_list, clients_avg_acc_list, global_acc_list)
     save_pics(clients_num)
